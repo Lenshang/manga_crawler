@@ -23,6 +23,10 @@ class MangaPark(scrapy.Spider):
     name = 'mangapark'
     allowed_domains = ['mangapark.net']
     DEBUG=False
+    _raw={}
+    with open("./proxy.json","r") as f:
+        rawstr="".join(f.readlines())
+        _raw=json.loads(rawstr)
     custom_settings = {
         'CONCURRENT_REQUESTS': 1,
         'REACTOR_THREADPOOL_MAXSIZE': 1,
@@ -36,7 +40,7 @@ class MangaPark(scrapy.Spider):
         "HTTPERROR_ALLOWED_CODES": [403,500,503],
         "MEDIA_ALLOW_REDIRECTS":True,
         "RETRY_HTTP_CODES":[],
-        "FILES_STORE":"./temp",
+        "FILES_STORE":_raw["save_path"],
         "ITEM_PIPELINES": {
             'manga_crawler.pipelines.ImagePipeline.ImagePipeline': 100,
             'manga_crawler.pipelines.LocalFilePipeline.LocalFilePipeline': 200,
@@ -70,22 +74,19 @@ class MangaPark(scrapy.Spider):
         self.base_path="./_temp"
 
         # 创建代理
-        with open("./proxy.json","r") as f:
-            rawstr="".join(f.readlines())
-            raw=json.loads(rawstr)
-            # url="http://192.168.31.153:9090/proxies/GLOBAL"
-            self.base_url=raw["api"]
-            self.secret=raw["secret"]
-            self.proxy=raw["proxy"]
-            url=parse.urljoin(self.base_url,"/proxies")
-            r=requests.get(url, headers={
-                'content-type': 'application/json',
-                "Authorization":"Bearer "+self.secret
-                })
-            raw=json.loads(r.text)
-            for item in raw["proxies"]["GLOBAL"]["all"]:
-                if re.fullmatch(".*?[0-2][0-9]$",item):
-                    self.proxy_names.append(item)
+        # url="http://192.168.31.153:9090/proxies/GLOBAL"
+        self.base_url=self._raw["api"]
+        self.secret=self._raw["secret"]
+        self.proxy=self._raw["proxy"]
+        url=parse.urljoin(self.base_url,"/proxies")
+        r=requests.get(url, headers={
+            'content-type': 'application/json',
+            "Authorization":"Bearer "+self.secret
+            })
+        raw=json.loads(r.text)
+        for item in raw["proxies"]["GLOBAL"]["all"]:
+            if re.fullmatch(".*?[0-2][0-9]$",item):
+                self.proxy_names.append(item)
     def start_requests(self):
         self.logger.info("启动")
         url=f"https://mangapark.net/search?genres=full_color&sortby=field_name&page=1"
@@ -211,7 +212,7 @@ class MangaPark(scrapy.Spider):
     
     def before_request(self, request):
         now=DateTime.Now()
-        if (now-self.last_change_proxy)>TimeSpan(second=60):
+        if (now-self.last_change_proxy)>TimeSpan(second=60) or (request.meta.get("retry_times") and request.meta["retry_times"]>1):
             # 切代理
             self.p+=1
             params={"name":self.proxy_names[rd.randint(0,len(self.proxy_names)-1)]}
