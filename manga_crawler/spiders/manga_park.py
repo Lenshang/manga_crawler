@@ -5,7 +5,9 @@ import time
 from dateutil.rrule import YEARLY
 import os
 import requests
+import re
 import scrapy
+import random as rd
 import ua_generator
 from scrapy import item
 from manga_crawler.model.manga_park import MangaInfo,ChapterInfo,ImageInfo
@@ -14,6 +16,7 @@ from scrapy.http import Request
 from scrapy.http.response.html import HtmlResponse
 from ExObject.DateTime import DateTime
 from ExObject.ExObject import ExObject
+from ExObject.TimeSpan import TimeSpan
 from urllib import parse
 # 需求 https://w60vfd7bfh.feishu.cn/docx/LlFudfg0lovsjxxhOSUcT86bnHc
 class MangaPark(scrapy.Spider):
@@ -62,9 +65,27 @@ class MangaPark(scrapy.Spider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.p=0
-        self.proxies=[]
+        self.proxy_names=[]
+        self.last_change_proxy=DateTime(1999,1,1)
         self.base_path="./_temp"
 
+        # 创建代理
+        with open("./proxy.json","r") as f:
+            rawstr="".join(f.readlines())
+            raw=json.loads(rawstr)
+            # url="http://192.168.31.153:9090/proxies/GLOBAL"
+            self.base_url=raw["api"]
+            self.secret=raw["secret"]
+            self.proxy=raw["proxy"]
+            url=parse.urljoin(self.base_url,"/proxies")
+            r=requests.get(url, headers={
+                'content-type': 'application/json',
+                "Authorization":"Bearer "+self.secret
+                })
+            raw=json.loads(r.text)
+            for item in raw["proxies"]["GLOBAL"]["all"]:
+                if re.fullmatch(".*?[0-2][0-9]$",item):
+                    self.proxy_names.append(item)
     def start_requests(self):
         self.logger.info("启动")
         url=f"https://mangapark.net/search?genres=full_color&sortby=field_name&page=1"
@@ -189,14 +210,16 @@ class MangaPark(scrapy.Spider):
         return headers
     
     def before_request(self, request):
-        # if request.meta.get("retry_times") and request.meta["retry_times"]>1:
-        #     # 切代理
-        #     self.p+=1
-        #     params={"name":self.proxies[self.p%len(self.proxies)]}
-        #     url="http://192.168.31.153:9090/proxies/GLOBAL"
-        #     r=requests.put(url, json=params, headers={
-        #         'content-type': 'application/json',
-        #         "Authorization":"Bearer 7f74162fc2d68bfdf74141616d30b09f5a65dcd440ffa1536f4679dd297aab70"
-        #         })
-        request.meta['proxy'] = "http://127.0.0.1:7890"
+        now=DateTime.Now()
+        if (now-self.last_change_proxy)>TimeSpan(second=60):
+            # 切代理
+            self.p+=1
+            params={"name":self.proxy_names[rd.randint(0,len(self.proxy_names)-1)]}
+            url=parse.urljoin(self.base_url,"/proxies/GLOBAL")
+            r=requests.put(url, json=params, headers={
+                'content-type': 'application/json',
+                "Authorization":"Bearer "+self.secret
+                })
+            self.last_change_proxy=now
+        request.meta['proxy'] = self.proxy
         return request
