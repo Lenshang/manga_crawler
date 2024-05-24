@@ -89,17 +89,19 @@ class MangaPark(scrapy.Spider):
                 self.proxy_names.append(item)
     def start_requests(self):
         self.logger.info("启动")
-        url=f"https://mangapark.net/search?genres=full_color&sortby=field_name&page=1"
+        url=f"https://mangapark.net/search?genres=full_color&sortby=field_name&page=2"
         #headers=self.headers.copy()
         headers=self.get_header()
         headers["cookie"]=self.get_cookie()
         yield Request(url, callback=self.parse_manga_list,headers=headers,dont_filter=True,meta={
-            "page":1,
+            "page":2,
         })
 
     def parse_manga_list(self,response):
         selector=ExScrapyObj(response)
+        has_next=False
         for item in selector.xpath('//*[@id="app-wrapper"]/main/div[5]/div'):
+            has_next=True
             db_manga=MangaInfo()
             db_manga["manga_url"]=item.xpath(".//h3/a/@href").extract().FirstOrDefaultString().strip()
             if not db_manga["manga_url"]:
@@ -118,6 +120,15 @@ class MangaPark(scrapy.Spider):
                 "db_manga":db_manga,
             })
 
+        # 翻页
+        if has_next:
+            page=response.meta["page"]+1
+            url=f"https://mangapark.net/search?genres=full_color&sortby=field_name&page="+str(page)
+            headers=self.get_header()
+            headers["cookie"]=self.get_cookie()
+            yield Request(url, callback=self.parse_manga_list,headers=headers,dont_filter=True,meta={
+                "page":page,
+            })
     def parse_manga_chapter(self,response):
         db_manga=response.meta["db_manga"]
         selector=ExScrapyObj(response)
