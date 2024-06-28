@@ -191,7 +191,7 @@ class MangaPark(scrapy.Spider):
             yield db_image
 
     def get_cookie(self):
-        ck="""Hm_lvt_a7025e25c8500c732b8f48cc46e21467=1716138830; theme=mdark; tfv=1716138947082; ps_sort=field_name; cf_clearance=f2U8suCaFMS6L1WQh4bwxStXHZi68w.nMWh130s3ZLA-1716139708-1.0.1.1-2CyZLSA4mj.3Nw2Y5lu4lwyWxSyULc.rriUQMZO6YEltqBSzDxB6NZ6o5h8bF6ao5luF1FMEzq9czeHmkA_MhA; Hm_lpvt_a7025e25c8500c732b8f48cc46e21467=1716141222"""
+        ck="""theme=mdark; tfv=1716138947082; ps_sort=field_name; Hm_lvt_a7025e25c8500c732b8f48cc46e21467=1719567116; Hm_lpvt_a7025e25c8500c732b8f48cc46e21467=1719567116; cf_clearance=NNAK2YjkWndzTFlKA9p1Q746ViOptjQmI3VzlbePDGw-1719567115-1.0.1.1-Akj9ufR8.zm2.M6o4JoAzd6Sz0IM_F56uOAscmqbLRnw_wYM2rvSb.._xAw2IP8gBESBSQFdb.7cznNYqHwEdQ"""
         return ck
     
     def get_ua(self,level=0):
@@ -233,5 +233,6 @@ class MangaPark(scrapy.Spider):
                 "Authorization":"Bearer "+self.secret
                 })
             self.last_change_proxy=now
+            self.logger.info("change proxy to "+params["name"])
         request.meta['proxy'] = self.proxy
         return request
